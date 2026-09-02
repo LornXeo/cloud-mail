@@ -3,7 +3,7 @@ import { email } from './email/email';
 import userService from './service/user-service';
 import verifyRecordService from './service/verify-record-service';
 import emailService from './service/email-service';
-import kvObjService from './service/kv-obj-service';
+import r2Service from './service/r2-service';
 import oauthService from './service/oauth-service';
 import analysisService from './service/analysis-service';
 export default {
@@ -18,7 +18,24 @@ export default {
 		}
 
 		 if (['/static/','/attachments/'].some(p => url.pathname.startsWith(p))) {
-			 return await kvObjService.toObjResp( { env }, url.pathname.substring(1));
+			const obj = await r2Service.getObj({ env }, url.pathname.substring(1));
+
+			if (!obj) {
+				return new Response('Not Found', { status: 404 });
+			}
+
+			// R2 returns an object body; KV/S3 adapters may already return a Response.
+			if (obj instanceof Response) {
+				return obj;
+			}
+
+			return new Response(obj.body, {
+				headers: {
+					'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
+					'Content-Disposition': obj.httpMetadata?.contentDisposition || 'inline',
+					'Cache-Control': obj.httpMetadata?.cacheControl || 'public, max-age=31536000, immutable'
+				}
+			});
 		 }
 
 		return env.assets.fetch(req);
