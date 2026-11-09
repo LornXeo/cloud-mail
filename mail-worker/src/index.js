@@ -17,25 +17,15 @@ export default {
 			return app.fetch(req, env, ctx);
 		}
 
+		if (url.pathname.startsWith('/oss/')) {
+			const key = url.pathname.slice('/oss/'.length);
+			const resp = await r2Service.toObjResp({ env }, key);
+			return resp || new Response('Not Found', { status: 404 });
+		}
+
 		 if (['/static/','/attachments/'].some(p => url.pathname.startsWith(p))) {
-			const obj = await r2Service.getObj({ env }, url.pathname.substring(1));
-
-			if (!obj) {
-				return new Response('Not Found', { status: 404 });
-			}
-
-			// R2 returns an object body; KV/S3 adapters may already return a Response.
-			if (obj instanceof Response) {
-				return obj;
-			}
-
-			return new Response(obj.body, {
-				headers: {
-					'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
-					'Content-Disposition': obj.httpMetadata?.contentDisposition || 'inline',
-					'Cache-Control': obj.httpMetadata?.cacheControl || 'public, max-age=31536000, immutable'
-				}
-			});
+			 const resp = await r2Service.toObjResp({ env }, url.pathname.substring(1));
+			 return resp || new Response('Not Found', { status: 404 });
 		 }
 
 		return env.assets.fetch(req);
